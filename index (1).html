@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#EEF1F6">
+<meta name="description" content="A personal year tracker for courses, reading, writing and books.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<title>Year tracker</title>
+
+<style>
+:root{--bg:#EEF1F6;--card:#fff;--ink:#14213D;--mute:#66728C;--track:#DCE1EB;--line:#E4E8F0;--c1:#4F5BD5;--c2:#1F9D8B;--c3:#E39A1F;--on:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0F1522;--card:#182033;--ink:#EAF0FF;--mute:#93A0BD;--track:#2A3450;--line:#222C45;--c1:#7C88FF;--c2:#3CC9B2;--c3:#F2B544;--on:#0F1522}}
+:root[data-theme="dark"]{--bg:#0F1522;--card:#182033;--ink:#EAF0FF;--mute:#93A0BD;--track:#2A3450;--line:#222C45;--c1:#7C88FF;--c2:#3CC9B2;--c3:#F2B544;--on:#0F1522}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.35}
+main{max-width:480px;margin:0 auto;padding:20px 16px 32px}
+h1{font-size:44px;line-height:1;font-weight:800;margin:4px 0 6px;letter-spacing:-.02em}
+h2{font-size:18px;font-weight:600;margin:0 0 14px}
+.sub{color:var(--mute);font-size:15px;margin:0 0 14px}
+.card{background:var(--card);border-radius:20px;padding:18px;margin-top:14px}
+.bar{display:flex;gap:2px;height:16px;border-radius:8px;background:var(--track);overflow:hidden}
+.bar i{display:block;height:100%}
+.meta{display:flex;justify-content:space-between;gap:10px;font-size:14px;color:var(--mute);margin-top:6px}
+.item+.item{margin-top:18px}
+.item b{font-weight:600;font-size:16px}
+.nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.nav button{width:44px;height:44px;border:0;border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;font-size:20px}
+.nav button:disabled{opacity:.3}
+.nav span{font-weight:600;font-size:17px}
+.row{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.chk{flex:none;width:28px;height:28px;border-radius:50%;border:2px solid var(--track);display:grid;place-items:center;color:var(--on);font-size:15px}
+.chk.done{border-color:transparent}
+.rl{flex:1;min-width:0}
+.rl b{display:block;font-weight:600;font-size:16px}
+.rl small{color:var(--mute);font-size:13px}
+.st{display:flex;align-items:center;gap:6px}
+.st button{width:44px;height:44px;border:0;border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;font-size:22px;line-height:1}
+.st button:active,.nav button:active,.btn:active{opacity:.6}
+.st output{min-width:52px;text-align:center;font-weight:800;font-size:18px}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btn{flex:1;min-height:44px;border:0;border-radius:12px;background:var(--c2);color:var(--on);font:inherit;font-weight:600;font-size:15px}
+.btn.ghost{flex:none;padding:0 16px;background:var(--bg);color:var(--ink)}
+.dots{display:grid;grid-template-columns:repeat(14,1fr);gap:5px}
+.dots span{aspect-ratio:1;border-radius:50%;background:var(--track)}
+.dots span.p{background:var(--c1);opacity:.45}
+.dots span.f{background:var(--c1)}
+.dots span.now{outline:2px solid var(--ink);outline-offset:1px}
+.leg{display:flex;gap:14px;font-size:13px;color:var(--mute);margin-top:10px;flex-wrap:wrap}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:var(--track)}
+.foot{text-align:center;color:var(--mute);font-size:13px;margin-top:18px}
+.backup-note{color:var(--mute);font-size:13px;margin:0 0 12px}
+.backup-actions{display:flex;gap:8px;flex-wrap:wrap}
+.backup-actions .btn{min-width:0}
+
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+var START='2026-11-07',END='2027-11-06';
+var ROWS=[{k:'c',name:'Courses',unit:'h',step:.5,min:1,col:'--c1'},{k:'r',name:'Reading',unit:'h',step:.5,min:1,col:'--c2'},{k:'w',name:'Writing',unit:'pages',step:1,min:3,col:'--c3'}];
+var LS='yearTracker.v1';
+var state={days:{},books:[]};
+var sync='phone';
+var ref=null,writing=false,dirty=false;
+
+function pad(n){return String(n).padStart(2,'0')}
+function key(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function parse(k){var p=k.split('-').map(Number);return new Date(p[0],p[1]-1,p[2])}
+function diff(a,b){return Math.round((parse(b)-parse(a))/864e5)}
+function addDays(k,n){var d=parse(k);d.setDate(d.getDate()+n);return key(d)}
+function clamp(k){return k<START?START:k>END?END:k}
+function fmt(n){return Number.isInteger(n)?String(n):n.toFixed(1)}
+
+var today=clamp(key(new Date()));
+var sel=today;
+var months=[];(function(){var y=2026,m=11;for(var i=0;i<13;i++){months.push(y+'-'+pad(m));m++;if(m>12){m=1;y++}}})();
+
+try{var s=JSON.parse(localStorage.getItem(LS)||'null');if(s&&s.days){state=s;if(!state.books)state.books=[]}}catch(e){}
+
+function save(){
+  try{localStorage.setItem(LS,JSON.stringify(state))}catch(e){}
+  if(ref){dirty=true;flush()}
+}
+function flush(){
+  if(writing||!dirty||!ref)return;
+  writing=true;dirty=false;
+  ref.set(state).catch(function(){}).then(function(){writing=false;flush()});
+}
+
+function monthVals(fn){return months.map(function(m){return fn(m)})}
+function dayTotal(m,k){var t=0;Object.keys(state.days).forEach(function(d){if(d.slice(0,7)===m)t+=(state.days[d][k]||0)});return t}
+function total(k){return Object.keys(state.days).reduce(function(a,d){return a+(state.days[d][k]||0)},0)}
+
+function bar(vals,goal,col){
+  var sum=vals.reduce(function(a,b){return a+b},0),den=Math.max(sum,goal),h='';
+  vals.forEach(function(v,i){if(v>0)h+='<i style="width:'+(v/den*100)+'%;background:var('+col+');opacity:'+(i%2?.72:1)+'"></i>'});
+  return '<div class="bar">'+h+'</div>';
+}
+function meta(sum,goal,unit){
+  var right=sum<goal?fmt(goal-sum)+' '+unit+' left':sum>goal?fmt(sum-goal)+' '+unit+' beyond the goal':'Goal reached';
+  return '<div class="meta"><span>'+fmt(sum)+' of '+goal+' '+unit+'</span><span>'+right+'</span></div>';
+}
+
+function render(){
+  var n=diff(START,today)+1,left=diff(today,END);
+  var day=state.days[sel]||{c:0,r:0,w:0};
+  var h='<p class="sub">Nov 7, 2026 – Nov 6, 2027</p><h1>Day '+n+'</h1><p class="sub">'+left+' days left in the year</p>';
+  h+='<div class="bar" style="margin-bottom:2px"><i style="width:'+(n/365*100)+'%;background:var(--ink)"></i></div>';
+
+  h+='<section class="card"><div class="nav"><button data-nav="-1" aria-label="Previous day"'+(sel<=START?' disabled':'')+'>‹</button><span>'+(sel===today?'Today':parse(sel).toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'}))+'</span><button data-nav="1" aria-label="Next day"'+(sel>=today?' disabled':'')+'>›</button></div>';
+  ROWS.forEach(function(r){
+    var v=day[r.k]||0,ok=v>=r.min;
+    h+='<div class="row"><div class="chk'+(ok?' done':'')+'" style="'+(ok?'background:var('+r.col+')':'')+'">'+(ok?'✓':'')+'</div><div class="rl"><b>'+r.name+'</b><small>Minimum '+r.min+' '+r.unit+'</small></div><div class="st"><button data-a="'+r.k+'" data-d="-1" aria-label="Less '+r.name+'">−</button><output>'+fmt(v)+(r.unit==='h'?' h':'')+'</output><button data-a="'+r.k+'" data-d="1" aria-label="More '+r.name+'">+</button></div></div>';
+  });
+  h+='</section>';
+
+  var c=total('c'),w=total('w'),b=state.books.length,rh=total('r');
+  h+='<section class="card"><h2>This year</h2>';
+  h+='<div class="item"><b>Courses</b>'+bar(monthVals(function(m){return dayTotal(m,'c')}),100,'--c1')+meta(c,100,'h')+'</div>';
+  h+='<div class="item"><b>Books</b>'+bar(monthVals(function(m){return state.books.filter(function(d){return d.slice(0,7)===m}).length}),10,'--c2')+meta(b,10,b===1?'book':'books')+'<div class="meta"><span>'+fmt(rh)+' h of reading logged</span></div>'
+    +'<div class="btns"><button class="btn" data-book="1">Finished a book</button>'+(b?'<button class="btn ghost" data-book="-1">Undo</button>':'')+'</div></div>';
+  h+='<div class="item"><b>Writing</b>'+bar(monthVals(function(m){return dayTotal(m,'w')}),100,'--c3')+meta(w,100,'pages')+'</div>';
+  h+='</section>';
+
+  h+='<section class="card"><h2>Last 14 days</h2><div class="dots">';
+  for(var i=13;i>=0;i--){
+    var k=addDays(today,-i),d=state.days[k],cls='';
+    if(k<START){h+='<span style="opacity:.3"></span>';continue}
+    if(d){var any=(d.c||0)+(d.r||0)+(d.w||0)>0,all=(d.c||0)>=1&&(d.r||0)>=1&&(d.w||0)>=3;cls=all?'f':any?'p':''}
+    h+='<span class="'+cls+(k===sel?' now':'')+'"></span>';
+  }
+  h+='</div><div class="leg"><span><i></i>Nothing</span><span><i style="background:var(--c1);opacity:.45"></i>Something</span><span><i style="background:var(--c1)"></i>All three minimums</span></div></section>';
+  h+='<section class="card"><h2>Backup &amp; restore</h2><p class="backup-note">Export a backup file regularly. If you change phones, reinstall the app, or clear browser storage, you can import that file to restore your progress.</p><div class="backup-actions"><button class="btn" data-export="1">Export backup</button><button class="btn ghost" data-import="1">Import backup</button></div><input id="backup-file" type="file" accept=".json,application/json" hidden></section>';
+  h+='<p class="foot">Saved on this device. Keep this app&#39;s browser data to preserve your tracker.</p>';
+  document.getElementById('app').innerHTML=h;
+}
+
+document.addEventListener('click',function(e){
+  var t=e.target.closest('button');if(!t)return;
+  if(t.dataset.export){
+    var backup={app:'Year Tracker',version:1,exportedAt:new Date().toISOString(),data:state};
+    var blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+    var url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='year-tracker-backup-'+key(new Date())+'.json';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url)},1000);
+  }else if(t.dataset.import){
+    var picker=document.getElementById('backup-file');
+    if(picker)picker.click();
+  }else if(t.dataset.a){
+    var r=ROWS.filter(function(x){return x.k===t.dataset.a})[0];
+    var day=state.days[sel]||(state.days[sel]={c:0,r:0,w:0});
+    day[r.k]=Math.max(0,Math.round(((day[r.k]||0)+Number(t.dataset.d)*r.step)*2)/2);
+    save();render();
+  }else if(t.dataset.nav){
+    sel=clamp(addDays(sel,Number(t.dataset.nav)));if(sel>today)sel=today;render();
+  }else if(t.dataset.book){
+    if(t.dataset.book==='1')state.books.push(sel);else state.books.pop();
+    save();render();
+  }
+});
+
+
+document.addEventListener('change',function(e){
+  if(e.target.id!=='backup-file')return;
+  var file=e.target.files&&e.target.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(){
+    try{
+      var parsed=JSON.parse(String(reader.result||''));
+      var imported=parsed&&parsed.data?parsed.data:parsed;
+      if(!imported||typeof imported!=='object'||!imported.days||typeof imported.days!=='object'||Array.isArray(imported.days)||!Array.isArray(imported.books)){
+        throw new Error('This does not look like a Year Tracker backup.');
+      }
+      if(!window.confirm('Import this backup? Your current tracker data will be replaced by the data in the backup file.'))return;
+      state={days:imported.days,books:imported.books};
+      save();
+      render();
+      window.alert('Backup imported successfully.');
+    }catch(err){
+      window.alert('Could not import this file. Please choose a valid Year Tracker backup.');
+    }finally{
+      e.target.value='';
+    }
+  };
+  reader.onerror=function(){window.alert('Could not read this file. Please try again.');e.target.value='';};
+  reader.readAsText(file);
+});
+
+render();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("./sw.js").catch(function (err) {
+      console.warn("Service worker registration failed:", err);
+    });
+  });
+}
+
+// Offline PWA build: all tracker data is stored locally on this device.
+
+</script>
+</body>
+</html>
